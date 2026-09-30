@@ -132,15 +132,19 @@ def _extract_face(image: Image.Image):
 
 
 def _build_prompt(style_prompt: str, has_face: bool) -> str:
-    preservation = (
-        "Preserve the original composition, camera angle, subject positions and proportions. "
+    """Keep the original style prompt untouched for normal images.
+
+    Human photos receive only a short identity/anatomy hint. The IP-Adapter
+    remains responsible for most of the face preservation.
+    """
+    if not has_face:
+        return style_prompt.strip()
+
+    return (
+        f"{style_prompt.strip()} "
+        "Keep the person recognizable, preserve facial identity, expression, "
+        "hairstyle and natural human anatomy."
     )
-    if has_face:
-        preservation += (
-            "Keep the person recognizable. Preserve facial identity, facial proportions, "
-            "expression, hairstyle, body pose and natural human anatomy. "
-        )
-    return f"{preservation}{style_prompt.strip()}"
 
 
 async def generate_image(
