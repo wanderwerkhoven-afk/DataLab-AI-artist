@@ -10,7 +10,7 @@ const Home = () => {
   const [generatedPhoto, setGeneratedPhoto] = useState<string | null>(null);
   const [selectedEnvironment, setSelectedEnvironment] = useState("");
   const [strength, setStrength] = useState(0.5);
-  const [guidanceScale, setGuidanceScale] = useState(10);
+  const [guidanceScale, setGuidanceScale] = useState(6.5);
   const [step, setStep] = useState(1);
   const [stopCamera, setStopCamera] = useState(false);
   const [loading, setLoading] = useState(false);
