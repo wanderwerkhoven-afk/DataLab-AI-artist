@@ -1,328 +1,131 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Camera from "@/components/Camera";
-import PromptForm from "@/components/PromptForm";
 
-const Home = () => {
-  const [photo, setPhoto] = useState<string | null>(null);
-  const [originalPhoto, setOriginalPhoto] = useState<string | null>(null);
-  const [generatedPhoto, setGeneratedPhoto] = useState<string | null>(null);
-  const [selectedEnvironment, setSelectedEnvironment] = useState("");
-  const [strength, setStrength] = useState(0.5);
-  const [guidanceScale, setGuidanceScale] = useState(6.5);
-  const [step, setStep] = useState(1);
-  const [stopCamera, setStopCamera] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
+type Preset = "subtle" | "balanced" | "creative";
 
-  const environmentOptions = [
-    {
-      id: "environment-cartoon",
-      value:
-        "A colorful cartoon-style illustration of the original photo, highly stylized, bold outlines, flat colors, in the style of a Saturday morning cartoon.",
-      title: "Cartoon",
-    },
-    {
-      id: "environment-gogh",
-      value:
-        "An expressive post-impressionist painting of the original photo in the style of Vincent van Gogh, vibrant brush strokes, swirling textures, oil painting.",
-      title: "Van Gogh",
-    },
-    {
-      id: "environment-watercolor",
-      value:
-        "A soft watercolor painting version of the original photo, pastel tones, light brush strokes, impressionist style, artstation.",
-      title: "Watercolor",
-    },
-    
- {
-  id: "environment-disney",
-  value:
-    "Transform the original photo into a Disney-style animated scene, with magical lighting, expressive characters, vibrant colors, and whimsical atmosphere. Keep the people recognizable and their poses intact.",
-  title: "Disney",
-},
-{
- 
-  id: "environment-anime",
-  value:
-    "Transform the original photo into a Japanese anime-style illustration, with large expressive eyes, vibrant colors, clean lines, dynamic shading, and a dramatic background. Keep the people recognizable and their poses intact.",
-  title: "Anime",
-},
-{
-  id: "environment-winter",
-  value:
-    "Transform the original photo into a magical winter scene, with falling snow, frosty trees, a cool blue color palette, soft lighting, and a peaceful winter atmosphere. Keep the people recognizable and their poses intact.",
-  title: "Winter",
-  defaultStrength: 0.55,
-  defaultGuidance: 8.5,
-},
+const styles = [
+  { id:"cartoon", title:"Cartoon", icon:"✦", prompt:"A colorful cartoon-style illustration of the original photo, highly stylized, bold outlines, flat colors, playful animation aesthetic." },
+  { id:"gogh", title:"Van Gogh", icon:"◌", prompt:"An expressive post-impressionist painting of the original photo in the style of Vincent van Gogh, vibrant brush strokes, swirling textures, oil painting." },
+  { id:"watercolor", title:"Watercolor", icon:"≈", prompt:"A soft watercolor painting version of the original photo, pastel tones, light brush strokes, expressive paper texture." },
+  { id:"storybook", title:"Storybook", icon:"◇", prompt:"Transform the original photo into a whimsical fairytale storybook animated scene, magical lighting, expressive forms, vibrant colors. Keep people recognizable and poses intact." },
+  { id:"anime", title:"Anime", icon:"☆", prompt:"Transform the original photo into a Japanese anime-style illustration, vibrant colors, clean lines, dynamic shading and cinematic background. Keep people recognizable and poses intact." },
+  { id:"winter", title:"Winter", icon:"❄", prompt:"Transform the original photo into a magical winter scene, falling snow, frosty trees, cool color palette, soft lighting and peaceful winter atmosphere. Keep people recognizable and poses intact." },
+];
 
-  ];
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (step === 1) {
-      setPhoto(null);
-      setOriginalPhoto(null);
-      setGeneratedPhoto(null);
-      setStopCamera(false);
-      setSelectedEnvironment("");
-    }
-  }, [step]);
-
-  const getPhoto = async () => {
-    try {
-      const response = await fetch(`http://localhost:5000/take_photo`);
-      const blob = await response.blob();
-      const imageUrl = URL.createObjectURL(blob);
-      setPhoto(imageUrl);
-      setOriginalPhoto(imageUrl);
-      setStopCamera(true);
-      setStep(2);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    }
-  };
-
-  const sendPhotoWithTags = async () => {
-    if (!photo) return;
-
-    setLoading(true);
-    const tags = `${selectedEnvironment}`;
-
-    try {
-      const blob = await fetch(photo).then((res) => res.blob());
-      const formData = new FormData();
-      formData.append("image", blob, "captured_image.jpg");
-      formData.append("tags", tags);
-      formData.append("strength", strength.toString());
-      formData.append("guidance_scale", guidanceScale.toString());
-
-      const response = await fetch(`http://localhost:5000/generate_image`, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (response.ok) {
-        const imageBlob = await response.blob();
-        const imageUrl = URL.createObjectURL(imageBlob);
-        setGeneratedPhoto(imageUrl);
-        setStep(6); // ✅ Go directly to results
-      } else {
-        console.error("Failed to generate image");
-      }
-    } catch (error) {
-      console.error("Error sending data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const setPreset = (preset: "weak" | "medium" | "strong") => {
-    if (preset === "weak") {
-      setStrength(0.35);
-      setGuidanceScale(7);
-    } else if (preset === "medium") {
-      setStrength(0.55);
-      setGuidanceScale(9.5);
-    } else if (preset === "strong") {
-      setStrength(0.7);
-      setGuidanceScale(11);
-    }
-  };
-
-  const retakePhoto = () => {
-    setStep(1);
-  };
-
-  const goBack = () => {
-    if (step > 1) {
-      setStep(step - 1);
-    }
-  };
-
-  if (!isMounted) return null;
-
-  return (
-    <div className="flex flex-col items-center w-full max-h-screen text-black">
-      {/* ---------- CAMERA / PROMPT / GENERATE FLOW ---------- */}
-      {step !== 6 && (
-        <div className="flex h-screen w-full">
-          <div className="flex w-full bg-[#f5f5f5] relative">
-            <div className="flex items-center justify-center w-full max-h-screen overflow-hidden">
-              {!photo ? (
-                <Camera stopCamera={stopCamera} />
-              ) : (
-                <div className="relative flex items-center justify-center w-full h-full">
-                  <img
-                    src={photo}
-                    alt="Captured"
-                    className="w-full h-full object-contain"
-                  />
-                  {loading && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-neutral-600 bg-opacity-40 backdrop-blur-md text-white text-lg">
-                      Generating image, please wait...
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-col p-8 w-6/12 bg-white">
-            {/* STEP 1 - Take photo */}
-            {step === 1 && (
-              <div className="flex flex-col h-full w-full justify-end">
-                <button
-                  onClick={getPhoto}
-                  className="p-3 w-full bg-blue-500 text-white rounded hover:bg-blue-600"
-                >
-                  Take photo
-                </button>
-              </div>
-            )}
-
-            {/* STEP 2 - Select environment */}
-            {step === 2 && (
-              <PromptForm
-                title="Select a style"
-                options={environmentOptions}
-                selectedOption={selectedEnvironment}
-                setSelectedOption={setSelectedEnvironment}
-                onNext={() => selectedEnvironment && setStep(5)}
-                onBack={goBack}
-                onRetakePhoto={retakePhoto}
-              />
-            )}
-
-            {/* STEP 5 - Weak/Medium/Strong + Fine-tuning */}
-            {step === 5 && (
-              <div className="flex flex-col h-full w-full justify-between">
-                <div className="flex justify-between mb-6">
-                  <button
-                    onClick={goBack}
-                    className="p-5 border rounded text-neutral-400"
-                  >
-                    ←
-                  </button>
-                  <button onClick={retakePhoto} className="p-5 border rounded">
-                    <img className="w-4 h-4" src="refresh.svg" alt="refresh" />
-                  </button>
-                </div>
-
-                <h2 className="text-xl font-semibold mb-4">
-                  Choose strength preset
-                </h2>
-
-                <div className="flex gap-4 mb-6">
-                  <button
-                    onClick={() => setPreset("weak")}
-                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                  >
-                    Weak
-                  </button>
-                  <button
-                    onClick={() => setPreset("medium")}
-                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                  >
-                    Medium
-                  </button>
-                  <button
-                    onClick={() => setPreset("strong")}
-                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                  >
-                    Strong
-                  </button>
-                </div>
-
-                <label className="flex flex-col mb-4">
-                  <span>Strength (0-1):</span>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    value={strength}
-                    onChange={(e) => setStrength(parseFloat(e.target.value))}
-                    className="mt-2"
-                  />
-                  <span>{strength.toFixed(2)}</span>
-                </label>
-
-                <label className="flex flex-col mb-4">
-                  <span>Guidance Scale (1-15):</span>
-                  <input
-                    type="range"
-                    min="1"
-                    max="15"
-                    step="0.1"
-                    value={guidanceScale}
-                    onChange={(e) =>
-                      setGuidanceScale(parseFloat(e.target.value))
-                    }
-                    className="mt-2"
-                  />
-                  <span>{guidanceScale.toFixed(1)}</span>
-                </label>
-
-                <button
-                  onClick={sendPhotoWithTags}
-                  className={`p-3 rounded w-full text-white ${
-                    loading
-                      ? "bg-green-300 cursor-not-allowed opacity-50"
-                      : "bg-green-500 hover:bg-green-600"
-                  }`}
-                  disabled={!photo || !selectedEnvironment || loading}
-                >
-                  {loading ? "Generating..." : "Generate Image"}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ---------- STEP 6 - FULLSCREEN RESULT VIEW ---------- */}
-      {step === 6 && originalPhoto && generatedPhoto && (
-        <div className="flex flex-col w-full h-screen bg-white">
-          <div className="flex flex-1 flex-col md:flex-row w-full h-full">
-            {/* Original */}
-            <div className="flex-1 flex flex-col items-center justify-center p-4 bg-neutral-50">
-              <h3 className="text-lg font-medium mb-4">Original</h3>
-              <img
-                src={originalPhoto}
-                alt="Original"
-                className="w-full h-full object-contain rounded-lg shadow-md"
-              />
-            </div>
-
-            {/* Generated */}
-            <div className="flex-1 flex flex-col items-center justify-center p-4 bg-neutral-50">
-              <h3 className="text-lg font-medium mb-4">Generated</h3>
-              <img
-                src={generatedPhoto}
-                alt="Generated"
-                className="w-full h-full object-contain rounded-lg shadow-md"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-center p-6 bg-white shadow-inner">
-            <button
-              onClick={retakePhoto}
-              className="px-8 py-4 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-lg"
-            >
-              📸 Take a New Photo
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+const presets: Record<Preset,{strength:number; guidance:number; label:string; description:string}> = {
+  subtle:{strength:.35,guidance:7,label:"Subtle",description:"Keeps the original photo recognizable"},
+  balanced:{strength:.55,guidance:9.5,label:"Balanced",description:"A clear transformation with familiar composition"},
+  creative:{strength:.7,guidance:11,label:"Creative",description:"Lets AI reinterpret more of the scene"},
 };
 
-export default Home;
+const Arrow = ({back=false}:{back?:boolean}) => <span aria-hidden>{back ? "←" : "→"}</span>;
+
+export default function Home() {
+  const [photo,setPhoto]=useState<string|null>(null);
+  const [originalPhoto,setOriginalPhoto]=useState<string|null>(null);
+  const [generatedPhoto,setGeneratedPhoto]=useState<string|null>(null);
+  const [selectedId,setSelectedId]=useState("");
+  const [strength,setStrength]=useState(.55);
+  const [guidanceScale,setGuidanceScale]=useState(9.5);
+  const [preset,setPresetState]=useState<Preset>("balanced");
+  const [advanced,setAdvanced]=useState(false);
+  const [step,setStep]=useState(1);
+  const [stopCamera,setStopCamera]=useState(false);
+  const [loading,setLoading]=useState(false);
+  const [mounted,setMounted]=useState(false);
+  const selected=useMemo(()=>styles.find(s=>s.id===selectedId),[selectedId]);
+
+  useEffect(()=>setMounted(true),[]);
+
+  const reset=()=>{
+    setPhoto(null); setOriginalPhoto(null); setGeneratedPhoto(null); setSelectedId("");
+    setStopCamera(false); setLoading(false); setPresetState("balanced");
+    setStrength(.55); setGuidanceScale(9.5); setStep(1);
+  };
+
+  const getPhoto=async()=>{
+    try{
+      const response=await fetch("http://localhost:5000/take_photo");
+      if(!response.ok) throw new Error("Photo capture failed");
+      const blob=await response.blob();
+      const url=URL.createObjectURL(blob);
+      setPhoto(url); setOriginalPhoto(url); setStopCamera(true); setStep(2);
+    }catch(error){ console.error(error); }
+  };
+
+  const choosePreset=(key:Preset)=>{
+    setPresetState(key); setStrength(presets[key].strength); setGuidanceScale(presets[key].guidance);
+  };
+
+  const generate=async()=>{
+    if(!photo||!selected) return;
+    setLoading(true);
+    try{
+      const blob=await fetch(photo).then(r=>r.blob());
+      const formData=new FormData();
+      formData.append("image",blob,"captured_image.jpg");
+      formData.append("tags",selected.prompt);
+      formData.append("strength",strength.toString());
+      formData.append("guidance_scale",guidanceScale.toString());
+      const response=await fetch("http://localhost:5000/generate_image",{method:"POST",body:formData});
+      if(!response.ok) throw new Error("Generation failed");
+      const imageBlob=await response.blob();
+      setGeneratedPhoto(URL.createObjectURL(imageBlob));
+      setStep(4);
+    }catch(error){ console.error(error); }
+    finally{ setLoading(false); }
+  };
+
+  const downloadResult=()=>{
+    if(!generatedPhoto) return;
+    const a=document.createElement("a"); a.href=generatedPhoto; a.download="datalab-ai-artist.jpg"; a.click();
+  };
+
+  if(!mounted) return null;
+
+  const labels=["Photo","Style","Adjust","Result"];
+
+  if(step===4 && originalPhoto && generatedPhoto){
+    return <main className="result-page">
+      <header className="topbar"><div className="brand"><span className="brand-mark">AI</span><span>DataLab <b>AI Artist</b></span></div><button className="ghost-btn" onClick={reset}>Start over ↻</button></header>
+      <section className="result-shell">
+        <div className="result-heading"><div><span className="eyebrow">CREATION COMPLETE</span><h1>Your image is ready</h1><p>{selected?.title} · {presets[preset].label} transformation</p></div></div>
+        <div className="comparison-grid">
+          <figure><div className="image-label">Original</div><img src={originalPhoto} alt="Original photo"/></figure>
+          <figure><div className="image-label accent">AI generated</div><img src={generatedPhoto} alt="AI generated result"/></figure>
+        </div>
+        <div className="result-actions"><button className="secondary-btn" onClick={()=>setStep(3)}>← Edit settings</button><button className="primary-btn" onClick={downloadResult}>Download image ↓</button><button className="secondary-btn" onClick={reset}>New photo</button></div>
+      </section>
+    </main>;
+  }
+
+  return <main className="studio">
+    <section className="preview-panel">
+      <div className="preview-top"><div className="brand brand-light"><span className="brand-mark">AI</span><span>DataLab <b>AI Artist</b></span></div><span className="live-pill"><i/> {photo?"PHOTO READY":"LIVE CAMERA"}</span></div>
+      <div className="preview-frame">
+        {!photo ? <Camera stopCamera={stopCamera}/> : <img src={photo} alt="Captured photo" className="captured"/>}
+        {loading && <div className="generation-overlay"><div className="loader"/><strong>Creating your {selected?.title} image…</strong><span>Transforming your photo with AI</span></div>}
+      </div>
+      <div className="preview-caption">{photo ? <><span>Captured photo</span><button onClick={reset}>Retake photo</button></> : <><span>Position your subject inside the frame</span><span>Camera preview</span></>}</div>
+    </section>
+
+    <aside className="control-panel">
+      <div className="stepper">{labels.map((label,i)=>{const n=i+1; const active=step===n; const done=step>n; return <div className={"step "+(active?"active ":"")+(done?"done":"")} key={label}><span>{done?"✓":String(n).padStart(2,"0")}</span><small>{label}</small></div>})}</div>
+
+      <div className="control-content">
+        {step===1 && <div className="screen-block"><span className="eyebrow">STEP 01</span><h1>Turn a photo into art.</h1><p className="lead">Take a photo to start creating a unique AI transformation.</p><div className="tip-card"><span className="tip-icon">◎</span><div><b>For the best result</b><p>Use a clear, well-lit scene and keep the camera steady.</p></div></div></div>}
+
+        {step===2 && <div className="screen-block"><span className="eyebrow">STEP 02</span><h1>Choose a style</h1><p className="lead">Pick the visual direction for your transformation.</p><div className="style-grid">{styles.map(s=><button key={s.id} className={"style-card "+(selectedId===s.id?"selected":"")} onClick={()=>setSelectedId(s.id)}><div className={"style-art "+s.id}><span>{s.icon}</span></div><div><b>{s.title}</b><small>{s.id==="winter"?"Scene effect":"Art style"}</small></div>{selectedId===s.id&&<i className="check">✓</i>}</button>)}</div></div>}
+
+        {step===3 && <div className="screen-block"><span className="eyebrow">STEP 03</span><h1>How creative should AI be?</h1><p className="lead">Choose how closely the result should follow your original photo.</p><div className="preset-list">{(Object.keys(presets) as Preset[]).map(key=><button key={key} onClick={()=>choosePreset(key)} className={"preset-card "+(preset===key?"selected":"")}><span className="preset-dot"/><div><b>{presets[key].label}</b><small>{presets[key].description}</small></div>{preset===key&&<span className="preset-check">✓</span>}</button>)}</div><button className="advanced-toggle" onClick={()=>setAdvanced(!advanced)}>Advanced settings <span>{advanced?"−":"+"}</span></button>{advanced&&<div className="advanced-box"><label><span>Transformation strength <b>{strength.toFixed(2)}</b></span><input type="range" min="0" max="1" step=".01" value={strength} onChange={e=>setStrength(+e.target.value)}/></label><label><span>Prompt guidance <b>{guidanceScale.toFixed(1)}</b></span><input type="range" min="1" max="15" step=".1" value={guidanceScale} onChange={e=>setGuidanceScale(+e.target.value)}/></label></div>}</div>}
+      </div>
+
+      <div className="bottom-actions">
+        {step===1 ? <button className="primary-btn" onClick={getPhoto}>Take photo <span>◎</span></button> :
+        <><button className="back-btn" onClick={()=>setStep(step-1)}><Arrow back/> Back</button>{step===2?<button disabled={!selectedId} className="primary-btn" onClick={()=>setStep(3)}>Continue <Arrow/></button>:<button disabled={loading} className="primary-btn generate" onClick={generate}>{loading?"Creating…":"Create image"} <span>✦</span></button>}</>}
+      </div>
+    </aside>
+  </main>;
+}
