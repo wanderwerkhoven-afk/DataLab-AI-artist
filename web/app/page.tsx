@@ -1,0 +1,328 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import Camera from "@/components/Camera";
+import PromptForm from "@/components/PromptForm";
+
+const Home = () => {
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [originalPhoto, setOriginalPhoto] = useState<string | null>(null);
+  const [generatedPhoto, setGeneratedPhoto] = useState<string | null>(null);
+  const [selectedEnvironment, setSelectedEnvironment] = useState("");
+  const [strength, setStrength] = useState(0.5);
+  const [guidanceScale, setGuidanceScale] = useState(10);
+  const [step, setStep] = useState(1);
+  const [stopCamera, setStopCamera] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  const environmentOptions = [
+    {
+      id: "environment-cartoon",
+      value:
+        "A colorful cartoon-style illustration of the original photo, highly stylized, bold outlines, flat colors, in the style of a Saturday morning cartoon.",
+      title: "Cartoon",
+    },
+    {
+      id: "environment-gogh",
+      value:
+        "An expressive post-impressionist painting of the original photo in the style of Vincent van Gogh, vibrant brush strokes, swirling textures, oil painting.",
+      title: "Van Gogh",
+    },
+    {
+      id: "environment-watercolor",
+      value:
+        "A soft watercolor painting version of the original photo, pastel tones, light brush strokes, impressionist style, artstation.",
+      title: "Watercolor",
+    },
+    
+ {
+  id: "environment-disney",
+  value:
+    "Transform the original photo into a Disney-style animated scene, with magical lighting, expressive characters, vibrant colors, and whimsical atmosphere. Keep the people recognizable and their poses intact.",
+  title: "Disney",
+},
+{
+ 
+  id: "environment-anime",
+  value:
+    "Transform the original photo into a Japanese anime-style illustration, with large expressive eyes, vibrant colors, clean lines, dynamic shading, and a dramatic background. Keep the people recognizable and their poses intact.",
+  title: "Anime",
+},
+{
+  id: "environment-winter",
+  value:
+    "Transform the original photo into a magical winter scene, with falling snow, frosty trees, a cool blue color palette, soft lighting, and a peaceful winter atmosphere. Keep the people recognizable and their poses intact.",
+  title: "Winter",
+  defaultStrength: 0.55,
+  defaultGuidance: 8.5,
+},
+
+  ];
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (step === 1) {
+      setPhoto(null);
+      setOriginalPhoto(null);
+      setGeneratedPhoto(null);
+      setStopCamera(false);
+      setSelectedEnvironment("");
+    }
+  }, [step]);
+
+  const getPhoto = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/take_photo`);
+      const blob = await response.blob();
+      const imageUrl = URL.createObjectURL(blob);
+      setPhoto(imageUrl);
+      setOriginalPhoto(imageUrl);
+      setStopCamera(true);
+      setStep(2);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    }
+  };
+
+  const sendPhotoWithTags = async () => {
+    if (!photo) return;
+
+    setLoading(true);
+    const tags = `${selectedEnvironment}`;
+
+    try {
+      const blob = await fetch(photo).then((res) => res.blob());
+      const formData = new FormData();
+      formData.append("image", blob, "captured_image.jpg");
+      formData.append("tags", tags);
+      formData.append("strength", strength.toString());
+      formData.append("guidance_scale", guidanceScale.toString());
+
+      const response = await fetch(`http://localhost:5000/generate_image`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        const imageBlob = await response.blob();
+        const imageUrl = URL.createObjectURL(imageBlob);
+        setGeneratedPhoto(imageUrl);
+        setStep(6); // ✅ Go directly to results
+      } else {
+        console.error("Failed to generate image");
+      }
+    } catch (error) {
+      console.error("Error sending data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const setPreset = (preset: "weak" | "medium" | "strong") => {
+    if (preset === "weak") {
+      setStrength(0.35);
+      setGuidanceScale(7);
+    } else if (preset === "medium") {
+      setStrength(0.55);
+      setGuidanceScale(9.5);
+    } else if (preset === "strong") {
+      setStrength(0.7);
+      setGuidanceScale(11);
+    }
+  };
+
+  const retakePhoto = () => {
+    setStep(1);
+  };
+
+  const goBack = () => {
+    if (step > 1) {
+      setStep(step - 1);
+    }
+  };
+
+  if (!isMounted) return null;
+
+  return (
+    <div className="flex flex-col items-center w-full max-h-screen text-black">
+      {/* ---------- CAMERA / PROMPT / GENERATE FLOW ---------- */}
+      {step !== 6 && (
+        <div className="flex h-screen w-full">
+          <div className="flex w-full bg-[#f5f5f5] relative">
+            <div className="flex items-center justify-center w-full max-h-screen overflow-hidden">
+              {!photo ? (
+                <Camera stopCamera={stopCamera} />
+              ) : (
+                <div className="relative flex items-center justify-center w-full h-full">
+                  <img
+                    src={photo}
+                    alt="Captured"
+                    className="w-full h-full object-contain"
+                  />
+                  {loading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-neutral-600 bg-opacity-40 backdrop-blur-md text-white text-lg">
+                      Generating image, please wait...
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col p-8 w-6/12 bg-white">
+            {/* STEP 1 - Take photo */}
+            {step === 1 && (
+              <div className="flex flex-col h-full w-full justify-end">
+                <button
+                  onClick={getPhoto}
+                  className="p-3 w-full bg-blue-500 text-white rounded hover:bg-blue-600"
+                >
+                  Take photo
+                </button>
+              </div>
+            )}
+
+            {/* STEP 2 - Select environment */}
+            {step === 2 && (
+              <PromptForm
+                title="Select a style"
+                options={environmentOptions}
+                selectedOption={selectedEnvironment}
+                setSelectedOption={setSelectedEnvironment}
+                onNext={() => selectedEnvironment && setStep(5)}
+                onBack={goBack}
+                onRetakePhoto={retakePhoto}
+              />
+            )}
+
+            {/* STEP 5 - Weak/Medium/Strong + Fine-tuning */}
+            {step === 5 && (
+              <div className="flex flex-col h-full w-full justify-between">
+                <div className="flex justify-between mb-6">
+                  <button
+                    onClick={goBack}
+                    className="p-5 border rounded text-neutral-400"
+                  >
+                    ←
+                  </button>
+                  <button onClick={retakePhoto} className="p-5 border rounded">
+                    <img className="w-4 h-4" src="refresh.svg" alt="refresh" />
+                  </button>
+                </div>
+
+                <h2 className="text-xl font-semibold mb-4">
+                  Choose strength preset
+                </h2>
+
+                <div className="flex gap-4 mb-6">
+                  <button
+                    onClick={() => setPreset("weak")}
+                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    Weak
+                  </button>
+                  <button
+                    onClick={() => setPreset("medium")}
+                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    Medium
+                  </button>
+                  <button
+                    onClick={() => setPreset("strong")}
+                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    Strong
+                  </button>
+                </div>
+
+                <label className="flex flex-col mb-4">
+                  <span>Strength (0-1):</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={strength}
+                    onChange={(e) => setStrength(parseFloat(e.target.value))}
+                    className="mt-2"
+                  />
+                  <span>{strength.toFixed(2)}</span>
+                </label>
+
+                <label className="flex flex-col mb-4">
+                  <span>Guidance Scale (1-15):</span>
+                  <input
+                    type="range"
+                    min="1"
+                    max="15"
+                    step="0.1"
+                    value={guidanceScale}
+                    onChange={(e) =>
+                      setGuidanceScale(parseFloat(e.target.value))
+                    }
+                    className="mt-2"
+                  />
+                  <span>{guidanceScale.toFixed(1)}</span>
+                </label>
+
+                <button
+                  onClick={sendPhotoWithTags}
+                  className={`p-3 rounded w-full text-white ${
+                    loading
+                      ? "bg-green-300 cursor-not-allowed opacity-50"
+                      : "bg-green-500 hover:bg-green-600"
+                  }`}
+                  disabled={!photo || !selectedEnvironment || loading}
+                >
+                  {loading ? "Generating..." : "Generate Image"}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ---------- STEP 6 - FULLSCREEN RESULT VIEW ---------- */}
+      {step === 6 && originalPhoto && generatedPhoto && (
+        <div className="flex flex-col w-full h-screen bg-white">
+          <div className="flex flex-1 flex-col md:flex-row w-full h-full">
+            {/* Original */}
+            <div className="flex-1 flex flex-col items-center justify-center p-4 bg-neutral-50">
+              <h3 className="text-lg font-medium mb-4">Original</h3>
+              <img
+                src={originalPhoto}
+                alt="Original"
+                className="w-full h-full object-contain rounded-lg shadow-md"
+              />
+            </div>
+
+            {/* Generated */}
+            <div className="flex-1 flex flex-col items-center justify-center p-4 bg-neutral-50">
+              <h3 className="text-lg font-medium mb-4">Generated</h3>
+              <img
+                src={generatedPhoto}
+                alt="Generated"
+                className="w-full h-full object-contain rounded-lg shadow-md"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-center p-6 bg-white shadow-inner">
+            <button
+              onClick={retakePhoto}
+              className="px-8 py-4 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-lg"
+            >
+              📸 Take a New Photo
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Home;
