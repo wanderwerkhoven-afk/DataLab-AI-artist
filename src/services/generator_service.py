@@ -9,18 +9,19 @@ from fastapi import HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from PIL import Image, ImageOps
 
-# Restore the original Stable Diffusion 1.5 generation base.
-# Face detection is an add-on: normal images follow the original img2img route,
-# while human images use a separate SD1.5 pipeline with the full-face IP-Adapter.
 MODEL_ID = "stable-diffusion-v1-5/stable-diffusion-v1-5"
 MODEL_DIR = "./models/sd15"
-IP_ADAPTER_ID = "h94/IP-Adapter"
-IP_ADAPTER_SUBFOLDER = "models"
-IP_ADAPTER_WEIGHT = "ip-adapter-full-face_sd15.bin"
+
+# Face pipeline: InsightFace identity embedding + CLIP face structure.
+FACEID_REPO = "h94/IP-Adapter-FaceID"
+FACEID_WEIGHT = "ip-adapter-faceid-plusv2_sd15.bin"
+FACEID_CLIP_MODEL = "laion/CLIP-ViT-H-14-laion2B-s32B-b79K"
+FACEID_WEIGHT_PATH = os.path.join(MODEL_DIR, FACEID_WEIGHT)
 
 MAX_IMAGE_SIZE = 768
 DEFAULT_STEPS = 30
-FACE_ADAPTER_SCALE = 0.50
+FACEID_SCALE = 0.75
+FACE_STRUCTURE_SCALE = 0.80
 
 FACE_NEGATIVE_PROMPT = (
     "deformed face, distorted face, asymmetrical eyes, crossed eyes, malformed eyes, "
@@ -51,9 +52,24 @@ def _load_base_pipeline():
     return _place_pipeline(pipe)
 
 
-def _load_face_pipeline():
-    dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+def _load_face_system():
+    """Load FaceID Plus V2 separately so the original SD1.5 route stays untouched."""
     try:
+        from insightface.app import FaceAnalysis
+        from ip_adapter.ip_adapter_faceid import IPAdapterFaceIDPlus
+
+        if not torch.cuda.is_available():
+            print("[AI Artist] FaceID Plus V2 requires CUDA in this kiosk setup; using SD1.5 fallback.")
+            return None, None
+
+        if not os.path.exists(FACEID_WEIGHT_PATH):
+            print(
+                f"[AI Artist] FaceID checkpoint missing at {FACEID_WEIGHT_PATH}. "
+                "Run python download.py first."
+            )
+            return None, None
+
+        dtype = torch.float16
         pipe = AutoPipelineForImage2Image.from_pretrained(
             MODEL_ID,
             torch_dtype=dtype,
@@ -62,24 +78,29 @@ def _load_face_pipeline():
             safety_checker=None,
             requires_safety_checker=False,
         )
-        # Hugging Face recommends DDIM/Euler for the SD1.5 face adapter.
         pipe.scheduler = DDIMScheduler.from_config(pipe.scheduler.config)
-        pipe.load_ip_adapter(
-            IP_ADAPTER_ID,
-            subfolder=IP_ADAPTER_SUBFOLDER,
-            weight_name=IP_ADAPTER_WEIGHT,
-            cache_dir=MODEL_DIR,
+
+        face_adapter = IPAdapterFaceIDPlus(
+            pipe,
+            FACEID_CLIP_MODEL,
+            FACEID_WEIGHT_PATH,
+            "cuda",
+            torch_dtype=dtype,
         )
-        pipe.set_ip_adapter_scale(FACE_ADAPTER_SCALE)
-        print("[AI Artist] SD1.5 + IP-Adapter Full Face pipeline loaded.")
-        return _place_pipeline(pipe)
+
+        providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+        face_analyser = FaceAnalysis(name="buffalo_l", providers=providers)
+        face_analyser.prepare(ctx_id=0, det_size=(640, 640))
+
+        print("[AI Artist] SD1.5 + IP-Adapter FaceID Plus V2 loaded.")
+        return face_adapter, face_analyser
     except Exception as exc:
-        print(f"[AI Artist] Face add-on unavailable; original SD1.5 remains usable: {exc}")
-        return None
+        print(f"[AI Artist] FaceID Plus V2 unavailable; original SD1.5 remains usable: {exc}")
+        return None, None
 
 
 base_pipeline = _load_base_pipeline()
-face_pipeline = _load_face_pipeline()
+face_adapter, face_analyser = _load_face_system()
 
 
 def _prepare_image(image: Image.Image) -> Image.Image:
@@ -95,44 +116,30 @@ def _prepare_image(image: Image.Image) -> Image.Image:
     return image.resize((width, height), Image.Resampling.LANCZOS)
 
 
-def _extract_face(image: Image.Image):
-    rgb = np.array(image)
-    gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
-    detector = cv2.CascadeClassifier(
-        os.path.join(cv2.data.haarcascades, "haarcascade_frontalface_default.xml")
-    )
-    faces = detector.detectMultiScale(
-        gray,
-        scaleFactor=1.1,
-        minNeighbors=5,
-        minSize=(80, 80),
-    )
-
-    if len(faces) == 0:
+def _extract_faceid(image: Image.Image):
+    """Return the largest detected face's identity embedding and aligned 224px face."""
+    if face_analyser is None:
         return None
 
-    x, y, w, h = max(faces, key=lambda face: face[2] * face[3])
-    pad_x = int(w * 0.45)
-    pad_top = int(h * 0.55)
-    pad_bottom = int(h * 0.35)
+    from insightface.utils import face_align
 
-    return ImageOps.fit(
-        image.crop(
-            (
-                max(0, x - pad_x),
-                max(0, y - pad_top),
-                min(image.width, x + w + pad_x),
-                min(image.height, y + h + pad_bottom),
-            )
-        ),
-        (512, 512),
-        method=Image.Resampling.LANCZOS,
-        centering=(0.5, 0.45),
+    rgb = np.array(image)
+    bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+    faces = face_analyser.get(bgr)
+
+    if not faces:
+        return None
+
+    face = max(
+        faces,
+        key=lambda item: (item.bbox[2] - item.bbox[0]) * (item.bbox[3] - item.bbox[1]),
     )
+    faceid_embeds = torch.from_numpy(face.normed_embedding).unsqueeze(0)
+    aligned_face = face_align.norm_crop(bgr, landmark=face.kps, image_size=224)
+    return faceid_embeds, aligned_face
 
 
 def _build_prompt(style_prompt: str, has_face: bool) -> str:
-    # Non-human images receive the exact original frontend prompt.
     if not has_face:
         return style_prompt.strip()
 
@@ -152,34 +159,41 @@ async def generate_image(
     try:
         image_data = await image.read()
         init_image = _prepare_image(Image.open(io.BytesIO(image_data)))
-        face_image = _extract_face(init_image)
+        face_data = _extract_faceid(init_image)
 
-        # Keep the original controls usable; only protect against invalid input.
         strength = max(0.0, min(float(strength), 1.0))
         guidance_scale = max(1.0, min(float(guidance_scale), 15.0))
 
-        use_face_pipeline = face_image is not None and face_pipeline is not None
-        final_prompt = _build_prompt(prompt, face_image is not None)
-
-        generation_args = {
-            "prompt": final_prompt,
-            "image": init_image,
-            "strength": strength,
-            "guidance_scale": guidance_scale,
-            "num_inference_steps": DEFAULT_STEPS,
-        }
-
-        if use_face_pipeline:
-            active_pipeline = face_pipeline
-            generation_args["ip_adapter_image"] = face_image
-            generation_args["negative_prompt"] = FACE_NEGATIVE_PROMPT
-            print("[AI Artist] Face detected: SD1.5 + face add-on.")
-        else:
-            active_pipeline = base_pipeline
-            print("[AI Artist] Original SD1.5 img2img route.")
+        use_faceid = face_data is not None and face_adapter is not None
+        final_prompt = _build_prompt(prompt, use_faceid)
 
         with torch.inference_mode():
-            generated_image = active_pipeline(**generation_args).images[0]
+            if use_faceid:
+                faceid_embeds, aligned_face = face_data
+                print("[AI Artist] Face detected: SD1.5 + FaceID Plus V2 route.")
+                generated_image = face_adapter.generate(
+                    face_image=aligned_face,
+                    faceid_embeds=faceid_embeds,
+                    prompt=final_prompt,
+                    negative_prompt=FACE_NEGATIVE_PROMPT,
+                    scale=FACEID_SCALE,
+                    shortcut=True,
+                    s_scale=FACE_STRUCTURE_SCALE,
+                    num_samples=1,
+                    guidance_scale=guidance_scale,
+                    num_inference_steps=DEFAULT_STEPS,
+                    image=init_image,
+                    strength=strength,
+                )[0]
+            else:
+                print("[AI Artist] Original SD1.5 img2img route.")
+                generated_image = base_pipeline(
+                    prompt=final_prompt,
+                    image=init_image,
+                    strength=strength,
+                    guidance_scale=guidance_scale,
+                    num_inference_steps=DEFAULT_STEPS,
+                ).images[0]
 
         img_bytes = io.BytesIO()
         generated_image.save(img_bytes, format="PNG")
