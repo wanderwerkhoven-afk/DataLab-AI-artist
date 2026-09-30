@@ -1,47 +1,45 @@
 from huggingface_hub import snapshot_download
 
-MODEL_CACHE = "./models/sdxl"
+SD15_CACHE = "./models/sd15"
 
-# Download only the files used by the PyTorch/Diffusers pipeline.
-# This intentionally excludes Flax, ONNX, OpenVINO and full single-file
-# checkpoints, which are large and not used by DataLab AI Artist.
-SDXL_PATTERNS = [
+# Stable Diffusion 1.5 is the original DataLab AI Artist generation base.
+# Download only PyTorch/Diffusers files used by the application.
+SD15_PATTERNS = [
     "model_index.json",
     "scheduler/*",
     "tokenizer/*",
-    "tokenizer_2/*",
     "text_encoder/config.json",
     "text_encoder/model.safetensors",
     "text_encoder/model.fp16.safetensors",
-    "text_encoder_2/config.json",
-    "text_encoder_2/model.safetensors",
-    "text_encoder_2/model.fp16.safetensors",
     "unet/config.json",
     "unet/diffusion_pytorch_model.safetensors",
     "unet/diffusion_pytorch_model.fp16.safetensors",
     "vae/config.json",
     "vae/diffusion_pytorch_model.safetensors",
     "vae/diffusion_pytorch_model.fp16.safetensors",
+    "feature_extractor/*",
+    "safety_checker/config.json",
+    "safety_checker/model.safetensors",
+    "safety_checker/model.fp16.safetensors",
 ]
 
 IP_ADAPTER_PATTERNS = [
-    "sdxl_models/ip-adapter-plus-face_sdxl_vit-h.safetensors",
+    "models/ip-adapter-full-face_sd15.bin",
     "models/image_encoder/*",
-    "sdxl_models/image_encoder/*",
 ]
 
-print("Downloading only the SDXL files required by Diffusers/PyTorch...")
+print("Downloading Stable Diffusion 1.5 Diffusers files...")
 snapshot_download(
-    "stabilityai/stable-diffusion-xl-base-1.0",
-    cache_dir=MODEL_CACHE,
-    allow_patterns=SDXL_PATTERNS,
+    "stable-diffusion-v1-5/stable-diffusion-v1-5",
+    cache_dir=SD15_CACHE,
+    allow_patterns=SD15_PATTERNS,
 )
 
-print("Downloading IP-Adapter Face files...")
+print("Downloading SD1.5 IP-Adapter Full Face add-on...")
 snapshot_download(
     "h94/IP-Adapter",
-    cache_dir=MODEL_CACHE,
+    cache_dir=SD15_CACHE,
     allow_patterns=IP_ADAPTER_PATTERNS,
 )
 
-print("Done. SDXL and IP-Adapter Face are available in the local cache.")
+print("Done. Original SD1.5 base + face add-on are available locally.")
