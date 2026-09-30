@@ -22,6 +22,7 @@ MAX_IMAGE_SIZE = 768
 DEFAULT_STEPS = 30
 FACEID_SCALE = 0.75
 FACE_STRUCTURE_SCALE = 0.80
+DEFAULT_SEED = 42
 
 FACE_NEGATIVE_PROMPT = (
     "deformed face, distorted face, asymmetrical eyes, crossed eyes, malformed eyes, "
@@ -78,7 +79,15 @@ def _load_face_system():
             safety_checker=None,
             requires_safety_checker=False,
         )
-        pipe.scheduler = DDIMScheduler.from_config(pipe.scheduler.config)
+        pipe.scheduler = DDIMScheduler.from_config(
+            pipe.scheduler.config,
+            beta_start=0.00085,
+            beta_end=0.012,
+            beta_schedule="scaled_linear",
+            clip_sample=False,
+            set_alpha_to_one=False,
+            steps_offset=1,
+        )
 
         face_adapter = IPAdapterFaceIDPlus(
             pipe,
@@ -136,7 +145,17 @@ def _extract_faceid(image: Image.Image):
     )
     faceid_embeds = torch.from_numpy(face.normed_embedding).unsqueeze(0)
     aligned_face = face_align.norm_crop(bgr, landmark=face.kps, image_size=224)
-    return faceid_embeds, aligned_face
+    return faceid_embeds, aligned_face, len(faces)
+
+
+def get_system_status():
+    return {
+        "base_model": "Stable Diffusion 1.5",
+        "face_model": "IP-Adapter FaceID Plus V2",
+        "faceid_ready": face_adapter is not None and face_analyser is not None,
+        "device": "cuda" if torch.cuda.is_available() else "cpu",
+        "seed": DEFAULT_SEED,
+    }
 
 
 def _build_prompt(style_prompt: str, has_face: bool) -> str:
@@ -169,8 +188,9 @@ async def generate_image(
 
         with torch.inference_mode():
             if use_faceid:
-                faceid_embeds, aligned_face = face_data
-                print("[AI Artist] Face detected: SD1.5 + FaceID Plus V2 route.")
+                faceid_embeds, aligned_face, face_count = face_data
+                print(f"[AI Artist] {face_count} face(s) detected: SD1.5 + FaceID Plus V2 route.")
+                generator = torch.Generator(device="cuda").manual_seed(DEFAULT_SEED)
                 generated_image = face_adapter.generate(
                     face_image=aligned_face,
                     faceid_embeds=faceid_embeds,
@@ -184,15 +204,19 @@ async def generate_image(
                     num_inference_steps=DEFAULT_STEPS,
                     image=init_image,
                     strength=strength,
+                    generator=generator,
                 )[0]
             else:
                 print("[AI Artist] Original SD1.5 img2img route.")
+                generator_device = "cuda" if torch.cuda.is_available() else "cpu"
+                generator = torch.Generator(device=generator_device).manual_seed(DEFAULT_SEED)
                 generated_image = base_pipeline(
                     prompt=final_prompt,
                     image=init_image,
                     strength=strength,
                     guidance_scale=guidance_scale,
                     num_inference_steps=DEFAULT_STEPS,
+                    generator=generator,
                 ).images[0]
 
         img_bytes = io.BytesIO()
