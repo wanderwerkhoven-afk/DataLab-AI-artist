@@ -18,9 +18,6 @@ SD15_PATTERNS = [
     "vae/diffusion_pytorch_model.safetensors",
     "vae/diffusion_pytorch_model.fp16.safetensors",
     "feature_extractor/*",
-    "safety_checker/config.json",
-    "safety_checker/model.safetensors",
-    "safety_checker/model.fp16.safetensors",
 ]
 
 IP_ADAPTER_PATTERNS = [
