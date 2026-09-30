@@ -15,9 +15,9 @@ const styles = [
 ];
 
 const presets: Record<Preset,{strength:number; guidance:number; label:string; description:string}> = {
-  subtle:{strength:.35,guidance:7,label:"Subtle",description:"Keeps the original photo recognizable"},
-  balanced:{strength:.55,guidance:9.5,label:"Balanced",description:"A clear transformation with familiar composition"},
-  creative:{strength:.7,guidance:11,label:"Creative",description:"Lets AI reinterpret more of the scene"},
+  subtle:{strength:.30,guidance:5.5,label:"Subtle",description:"Keeps the original photo recognizable"},
+  balanced:{strength:.45,guidance:6.5,label:"Balanced",description:"A clear transformation with familiar composition"},
+  creative:{strength:.60,guidance:7.5,label:"Creative",description:"Lets AI reinterpret more of the scene"},
 };
 
 const Arrow = ({back=false}:{back?:boolean}) => <span aria-hidden>{back ? "←" : "→"}</span>;
@@ -27,8 +27,8 @@ export default function Home() {
   const [originalPhoto,setOriginalPhoto]=useState<string|null>(null);
   const [generatedPhoto,setGeneratedPhoto]=useState<string|null>(null);
   const [selectedId,setSelectedId]=useState("");
-  const [strength,setStrength]=useState(.55);
-  const [guidanceScale,setGuidanceScale]=useState(9.5);
+  const [strength,setStrength]=useState(.45);
+  const [guidanceScale,setGuidanceScale]=useState(6.5);
   const [preset,setPresetState]=useState<Preset>("balanced");
   const [advanced,setAdvanced]=useState(false);
   const [step,setStep]=useState(1);
@@ -42,7 +42,7 @@ export default function Home() {
   const reset=()=>{
     setPhoto(null); setOriginalPhoto(null); setGeneratedPhoto(null); setSelectedId("");
     setStopCamera(false); setLoading(false); setPresetState("balanced");
-    setStrength(.55); setGuidanceScale(9.5); setStep(1);
+    setStrength(.45); setGuidanceScale(6.5); setStep(1);
   };
 
   const getPhoto=async()=>{
