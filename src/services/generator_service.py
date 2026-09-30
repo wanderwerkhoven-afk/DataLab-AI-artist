@@ -5,15 +5,10 @@ import cv2
 import numpy as np
 import torch
 from diffusers import AutoPipelineForImage2Image, DPMSolverMultistepScheduler
-from fastapi import UploadFile
+from fastapi import HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from PIL import Image, ImageOps
 
-# ---------------------------------------------------------------------------
-# Local AI Artist pipeline
-# ---------------------------------------------------------------------------
-# SDXL replaces SD 1.5 for better anatomy, faces and overall image quality.
-# Everything is still downloaded/cached and executed locally.
 MODEL_ID = "stabilityai/stable-diffusion-xl-base-1.0"
 MODEL_DIR = "./models/sdxl"
 IP_ADAPTER_ID = "h94/IP-Adapter"
@@ -32,27 +27,40 @@ NEGATIVE_PROMPT = (
 )
 
 
-def _load_pipeline():
-    dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+def _configure_pipeline(pipe):
+    pipe.scheduler = DPMSolverMultistepScheduler.from_config(
+        pipe.scheduler.config,
+        algorithm_type="dpmsolver++",
+        use_karras_sigmas=True,
+    )
+    if torch.cuda.is_available():
+        pipe.enable_model_cpu_offload()
+    else:
+        pipe.to("cpu")
+    return pipe
 
+
+def _load_base_pipeline():
+    dtype = torch.float16 if torch.cuda.is_available() else torch.float32
     pipe = AutoPipelineForImage2Image.from_pretrained(
         MODEL_ID,
         torch_dtype=dtype,
         cache_dir=MODEL_DIR,
         use_safetensors=True,
     )
+    print("[AI Artist] SDXL base pipeline loaded.")
+    return _configure_pipeline(pipe)
 
-    # A DPM++ scheduler is generally more stable for the relatively small number
-    # of inference steps used by this interactive demo.
-    pipe.scheduler = DPMSolverMultistepScheduler.from_config(
-        pipe.scheduler.config,
-        algorithm_type="dpmsolver++",
-        use_karras_sigmas=True,
-    )
 
-    # IP-Adapter Plus Face gives SDXL a second visual reference specifically for
-    # facial identity. If it cannot be loaded, the demo still works with SDXL.
+def _load_face_pipeline():
+    dtype = torch.float16 if torch.cuda.is_available() else torch.float32
     try:
+        pipe = AutoPipelineForImage2Image.from_pretrained(
+            MODEL_ID,
+            torch_dtype=dtype,
+            cache_dir=MODEL_DIR,
+            use_safetensors=True,
+        )
         pipe.load_ip_adapter(
             IP_ADAPTER_ID,
             subfolder=IP_ADAPTER_SUBFOLDER,
@@ -60,33 +68,27 @@ def _load_pipeline():
             cache_dir=MODEL_DIR,
         )
         pipe.set_ip_adapter_scale(FACE_ADAPTER_SCALE)
-        pipe._face_adapter_available = True
-        print("[AI Artist] SDXL + IP-Adapter Face loaded.")
+        print("[AI Artist] SDXL + IP-Adapter Face pipeline loaded.")
+        return _configure_pipeline(pipe)
     except Exception as exc:
-        pipe._face_adapter_available = False
-        print(f"[AI Artist] IP-Adapter unavailable; using SDXL only: {exc}")
-
-    if torch.cuda.is_available():
-        # Keeps VRAM use manageable on a local demo machine.
-        pipe.enable_model_cpu_offload()
-    else:
-        pipe.to("cpu")
-
-    return pipe
+        print(f"[AI Artist] Face pipeline unavailable; SDXL base remains usable: {exc}")
+        return None
 
 
-pipeline = _load_pipeline()
+# IMPORTANT: these are separate pipelines. Loading IP-Adapter modifies the UNet
+# configuration, so that same pipeline can no longer safely be called without
+# ip_adapter_image/image_embeds.
+base_pipeline = _load_base_pipeline()
+face_pipeline = _load_face_pipeline()
 
 
 def _prepare_image(image: Image.Image) -> Image.Image:
-    """Correct orientation and resize to an SDXL-friendly multiple of 8."""
     image = ImageOps.exif_transpose(image).convert("RGB")
     width, height = image.size
 
     scale = min(MAX_IMAGE_SIZE / max(width, height), 1.0)
     width = max(64, int(width * scale))
     height = max(64, int(height * scale))
-
     width -= width % 8
     height -= height % 8
 
@@ -94,7 +96,6 @@ def _prepare_image(image: Image.Image) -> Image.Image:
 
 
 def _extract_face(image: Image.Image):
-    """Return the largest detected face with some context, or None."""
     rgb = np.array(image)
     gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
 
@@ -113,9 +114,6 @@ def _extract_face(image: Image.Image):
         return None
 
     x, y, w, h = max(faces, key=lambda face: face[2] * face[3])
-
-    # Include hair, ears and part of the shoulders; this gives the adapter more
-    # identity information than an extremely tight face crop.
     pad_x = int(w * 0.45)
     pad_top = int(h * 0.55)
     pad_bottom = int(h * 0.35)
@@ -125,9 +123,8 @@ def _extract_face(image: Image.Image):
     right = min(image.width, x + w + pad_x)
     bottom = min(image.height, y + h + pad_bottom)
 
-    face = image.crop((left, top, right, bottom))
     return ImageOps.fit(
-        face,
+        image.crop((left, top, right, bottom)),
         (512, 512),
         method=Image.Resampling.LANCZOS,
         centering=(0.5, 0.45),
@@ -143,7 +140,6 @@ def _build_prompt(style_prompt: str, has_face: bool) -> str:
             "Keep the person recognizable. Preserve facial identity, facial proportions, "
             "expression, hairstyle, body pose and natural human anatomy. "
         )
-
     return f"{preservation}{style_prompt.strip()}"
 
 
@@ -153,18 +149,16 @@ async def generate_image(
     strength: float = 0.5,
     guidance_scale: float = 7.5,
 ):
-    """Generate a local SDXL img2img result, with face conditioning when possible."""
     try:
         image_data = await image.read()
         init_image = _prepare_image(Image.open(io.BytesIO(image_data)))
         face_image = _extract_face(init_image)
 
-        # Keep interactive controls within sensible SDXL ranges.
         strength = max(0.15, min(float(strength), 0.80))
         guidance_scale = max(1.0, min(float(guidance_scale), 12.0))
 
-        has_face = face_image is not None
-        final_prompt = _build_prompt(prompt, has_face)
+        use_face_pipeline = face_image is not None and face_pipeline is not None
+        final_prompt = _build_prompt(prompt, face_image is not None)
 
         generation_args = {
             "prompt": final_prompt,
@@ -175,21 +169,23 @@ async def generate_image(
             "num_inference_steps": DEFAULT_STEPS,
         }
 
-        if has_face and getattr(pipeline, "_face_adapter_available", False):
+        if use_face_pipeline:
             generation_args["ip_adapter_image"] = face_image
-            print("[AI Artist] Face detected: using SDXL + IP-Adapter Face.")
+            active_pipeline = face_pipeline
+            print("[AI Artist] Face detected: using dedicated SDXL + IP-Adapter pipeline.")
         else:
-            print("[AI Artist] No usable face adapter input: using SDXL img2img.")
+            active_pipeline = base_pipeline
+            print("[AI Artist] Using clean SDXL base pipeline.")
 
         with torch.inference_mode():
-            generated_image = pipeline(**generation_args).images[0]
+            generated_image = active_pipeline(**generation_args).images[0]
 
         img_bytes = io.BytesIO()
         generated_image.save(img_bytes, format="PNG")
         img_bytes.seek(0)
-
         return StreamingResponse(img_bytes, media_type="image/png")
 
     except Exception as exc:
         print(f"[AI Artist] Generation error: {exc}")
-        return {"error": str(exc)}
+        # Do not return JSON with HTTP 200: the frontend would interpret it as an image.
+        raise HTTPException(status_code=500, detail=f"Image generation failed: {exc}")
