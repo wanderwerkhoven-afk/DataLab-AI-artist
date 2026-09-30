@@ -1,9 +1,13 @@
 from fastapi import APIRouter, File, Form, UploadFile
 from fastapi.responses import StreamingResponse
 from services.camera_service import generate_frames, get_last_photo  
-from services.generator_service import generate_image  
+from services.generator_service import generate_image, get_system_status  
 
 api_router = APIRouter()
+
+@api_router.get("/status")
+async def system_status():
+    return get_system_status()
 
 @api_router.get('/video')
 async def video_feed():
