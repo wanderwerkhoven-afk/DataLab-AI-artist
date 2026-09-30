@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 import torch
 from diffusers import AutoPipelineForImage2Image, DPMSolverMultistepScheduler
+from transformers import CLIPVisionModelWithProjection
 from fastapi import HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from PIL import Image, ImageOps
@@ -55,11 +56,22 @@ def _load_base_pipeline():
 def _load_face_pipeline():
     dtype = torch.float16 if torch.cuda.is_available() else torch.float32
     try:
+        # IP-Adapter Plus Face for SDXL uses patch embeddings from the ViT-H
+        # encoder. Load that encoder explicitly; otherwise Diffusers may select
+        # an incompatible CLIP encoder and fail with a matrix shape mismatch.
+        image_encoder = CLIPVisionModelWithProjection.from_pretrained(
+            IP_ADAPTER_ID,
+            subfolder="models/image_encoder",
+            torch_dtype=dtype,
+            cache_dir=MODEL_DIR,
+            use_safetensors=True,
+        )
         pipe = AutoPipelineForImage2Image.from_pretrained(
             MODEL_ID,
             torch_dtype=dtype,
             cache_dir=MODEL_DIR,
             use_safetensors=True,
+            image_encoder=image_encoder,
         )
         pipe.load_ip_adapter(
             IP_ADAPTER_ID,
