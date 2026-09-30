@@ -44,6 +44,8 @@ def _load_base_pipeline():
         torch_dtype=dtype,
         cache_dir=MODEL_DIR,
         use_safetensors=True,
+        safety_checker=None,
+        requires_safety_checker=False,
     )
     print("[AI Artist] Original SD1.5 img2img pipeline loaded.")
     return _place_pipeline(pipe)
@@ -57,6 +59,8 @@ def _load_face_pipeline():
             torch_dtype=dtype,
             cache_dir=MODEL_DIR,
             use_safetensors=True,
+            safety_checker=None,
+            requires_safety_checker=False,
         )
         # Hugging Face recommends DDIM/Euler for the SD1.5 face adapter.
         pipe.scheduler = DDIMScheduler.from_config(pipe.scheduler.config)
