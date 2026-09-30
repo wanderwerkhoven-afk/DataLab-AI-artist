@@ -1,4 +1,5 @@
 --index-url https://download.pytorch.org/whl/cu124
+--extra-index-url https://pypi.org/simple
 
 torch
 torchvision
@@ -11,3 +12,7 @@ uvicorn
 opencv-python
 ultralytics
 python-multipart
+huggingface-hub
+insightface==0.7.3
+onnxruntime-gpu
+git+https://github.com/tencent-ailab/IP-Adapter.git
