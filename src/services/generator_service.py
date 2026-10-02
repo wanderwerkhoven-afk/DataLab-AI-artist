@@ -201,7 +201,6 @@ async def generate_image(
             if use_faceid:
                 faceid_embeds, aligned_face, face_count = face_data
                 print(f"[AI Artist] {face_count} face(s) detected: SD1.5 + FaceID Plus V2 route.")
-                generator = torch.Generator(device="cuda").manual_seed(DEFAULT_SEED)
                 generated_image = face_adapter.generate(
                     face_image=aligned_face,
                     faceid_embeds=faceid_embeds,
@@ -215,7 +214,7 @@ async def generate_image(
                     num_inference_steps=DEFAULT_STEPS,
                     image=init_image,
                     strength=strength,
-                    generator=generator,
+                    seed=DEFAULT_SEED,
                 )[0]
             else:
                 print("[AI Artist] Original SD1.5 img2img route.")
