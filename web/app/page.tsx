@@ -15,18 +15,12 @@ const styles = [
 ];
 
 const presets: Record<Preset,{strength:number; guidance:number; label:string; description:string}> = {
-  subtle:{strength:.75,guidance:3.5,label:"Subtiel",description:"Houdt de originele foto goed herkenbaar"},
+  subtle:{strength:.40,guidance:11.0,label:"Subtiel",description:"Houdt de originele foto goed herkenbaar"},
   balanced:{strength:.45,guidance:7.5,label:"Gebalanceerd",description:"Een duidelijke verandering, maar de foto blijft herkenbaar"},
-  creative:{strength:.40,guidance:11.0,label:"Creatief",description:"Geeft AI meer vrijheid om de foto te veranderen"},
+  creative:{strength:.75,guidance:3.5,label:"Creatief",description:"Geeft AI meer vrijheid om de foto te veranderen"},
 };
 
 const Arrow = ({back=false}:{back?:boolean}) => <span aria-hidden>{back ? "←" : "→"}</span>;
-
-const photoSimilarityLabel = (value:number) =>
-  value >= .75 ? "Lijkt veel op de foto" : value >= .45 ? "Blijft redelijk herkenbaar" : "Mag veel veranderen";
-
-const artisticLabel = (value:number) =>
-  value <= 5 ? "Rustig" : value <= 9 ? "Kunstig" : "Heel kunstig";
 
 export default function Home() {
   const [photo,setPhoto]=useState<string|null>(null);
@@ -97,7 +91,7 @@ export default function Home() {
   if(fullscreenResult && generatedPhoto){
     return <main className="fullscreen-result" onClick={()=>setFullscreenResult(false)}>
       <button className="fullscreen-close" onClick={()=>setFullscreenResult(false)} aria-label="Volledig scherm sluiten">×</button>
-      <img src={generatedPhoto} alt="Door AI gemaakt result fullscreen"/>
+      <img src={generatedPhoto} alt="Door AI gemaakt resultaat, volledig scherm"/>
       <div className="fullscreen-hint"><strong>Maak een foto van je creatie</strong><span>Klik ergens om terug te gaan</span></div>
     </main>;
   }
@@ -109,7 +103,7 @@ export default function Home() {
         <div className="result-heading"><div><span className="eyebrow">CREATIE KLAAR</span><h1>Je afbeelding is klaar</h1><p>{selected?.title} · {presets[preset].label} transformatie</p></div></div>
         <div className="comparison-grid">
           <figure><div className="image-label">Origineel</div><img src={originalPhoto} alt="Originele foto"/></figure>
-          <figure><div className="image-label accent">Door AI gemaakt</div><img src={generatedPhoto} alt="Door AI gemaakt result"/></figure>
+          <figure><div className="image-label accent">Door AI gemaakt</div><img src={generatedPhoto} alt="Door AI gemaakt resultaat"/></figure>
         </div>
         <div className="result-actions"><button className="secondary-btn" onClick={()=>setStep(3)}>← Instellingen aanpassen</button><button className="primary-btn" onClick={()=>setFullscreenResult(true)}>Volledig scherm ⛶</button><button className="secondary-btn" onClick={downloadResult}>Afbeelding downloaden ↓</button><button className="secondary-btn" onClick={reset}>Nieuwe foto</button></div>
       </section>
@@ -130,11 +124,11 @@ export default function Home() {
       <div className="stepper">{labels.map((label,i)=>{const n=i+1; const active=step===n; const done=step>n; return <div className={"step "+(active?"active ":"")+(done?"done":"")} key={label}><span>{done?"✓":String(n).padStart(2,"0")}</span><small>{label}</small></div>})}</div>
 
       <div className="control-content">
-        {step===1 && <div className="screen-block"><span className="eyebrow">STAP 01</span><h1>Maak kunst van een foto.</h1><p className="lead">Take a photo to start creating a unique AI transformatie.</p><div className="tip-card"><span className="tip-icon">◎</span><div><b>Voor het beste resultaat</b><p>Zorg voor voldoende licht en houd de camera stil.</p></div></div></div>}
+        {step===1 && <div className="screen-block"><span className="eyebrow">STAP 01</span><h1>Maak kunst van een foto.</h1><p className="lead">Maak een foto om een unieke AI-transformatie te starten.</p><div className="tip-card"><span className="tip-icon">◎</span><div><b>Voor het beste resultaat</b><p>Zorg voor voldoende licht en houd de camera stil.</p></div></div></div>}
 
-        {step===2 && <div className="screen-block"><span className="eyebrow">STAP 02</span><h1>Kies een stijl</h1><p className="lead">Pick the visual direction for your transformatie.</p><div className="style-grid">{styles.map(s=><button key={s.id} className={"style-card "+(selectedId===s.id?"selected":"")} onClick={()=>setSelectedId(s.id)}><div className="style-art"><img src={s.image} alt={s.title+" style reference"} loading="lazy"/></div><div><b>{s.title}</b><small>{s.id==="winter"?"Sfeereffect":"Kunststijl"}</small></div>{selectedId===s.id&&<i className="check">✓</i>}</button>)}</div></div>}
+        {step===2 && <div className="screen-block"><span className="eyebrow">STAP 02</span><h1>Kies een stijl</h1><p className="lead">Kies de visuele richting voor je transformatie.</p><div className="style-grid">{styles.map(s=><button key={s.id} className={"style-card "+(selectedId===s.id?"selected":"")} onClick={()=>setSelectedId(s.id)}><div className="style-art"><img src={s.image} alt={s.title+" stijlreferentie"} loading="lazy"/></div><div><b>{s.title}</b><small>{s.id==="winter"?"Sfeereffect":"Kunststijl"}</small></div>{selectedId===s.id&&<i className="check">✓</i>}</button>)}</div></div>}
 
-        {step===3 && <div className="screen-block"><span className="eyebrow">STAP 03</span><h1>Hoe creatief mag AI zijn?</h1><p className="lead">Kies hoeveel het resultaat op je originele foto moet blijven lijken.</p><div className="preset-list">{(Object.keys(presets) as Preset[]).map(key=><button key={key} onClick={()=>choosePreset(key)} className={"preset-card "+(preset===key?"selected":"")}><span className="preset-dot"/><div><b>{presets[key].label}</b><small>{presets[key].description}</small></div>{preset===key&&<span className="preset-check">✓</span>}</button>)}</div><div className="closeup-warning"><b>Close-up van een gezicht?</b><span>Bij close-ups kan AI gezichten soms onnatuurlijk maken. Voor de beste resultaten adviseren we <strong>kunstigheid boven 11</strong> en <strong>foto overnemen onder 0.35</strong>.</span></div><button className="advanced-toggle" onClick={()=>setAdvanced(!advanced)}>Geavanceerde instellingen <span>{advanced?"−":"+"}</span></button>{advanced&&<div className="advanced-box"><label><span>Hoe erg gaat het op de foto lijken? <b>{guidanceScale.toFixed(1)} · {guidanceScale >= 10 ? "Lijkt veel op de foto" : guidanceScale >= 6 ? "Blijft redelijk herkenbaar" : "Mag veel veranderen"}</b></span><input type="range" min="1" max="15" step=".1" value={guidanceScale} onChange={e=>setGuidanceScale(+e.target.value)}/></label><label><span>Hoe kunstig gaat het worden? <b>{strength.toFixed(2)} · {strength <= .4 ? "Rustig" : strength <= .7 ? "Kunstig" : "Heel kunstig"}</b></span><input type="range" min="0" max="1" step=".01" value={strength} onChange={e=>setStrength(+e.target.value)}/></label></div>}</div>}
+        {step===3 && <div className="screen-block"><span className="eyebrow">STAP 03</span><h1>Hoe creatief mag AI zijn?</h1><p className="lead">Kies hoeveel het resultaat op je originele foto moet blijven lijken.</p><div className="preset-list">{(Object.keys(presets) as Preset[]).map(key=><button key={key} onClick={()=>choosePreset(key)} className={"preset-card "+(preset===key?"selected":"")}><span className="preset-dot"/><div><b>{presets[key].label}</b><small>{presets[key].description}</small></div>{preset===key&&<span className="preset-check">✓</span>}</button>)}</div><div className="closeup-warning"><b>Close-up van een gezicht?</b><span>Bij close-ups kan AI gezichten soms onnatuurlijk maken. Voor de beste resultaten adviseren we <strong>foto overnemen onder 3.5</strong> en <strong>kunstigheid vanaf 0.75</strong>.</span></div><button className="advanced-toggle" onClick={()=>setAdvanced(!advanced)}>Geavanceerde instellingen <span>{advanced?"−":"+"}</span></button>{advanced&&<div className="advanced-box"><label><span>Hoe erg gaat het op de foto lijken? <b>{guidanceScale.toFixed(1)} · {guidanceScale >= 10 ? "Lijkt veel op de foto" : guidanceScale >= 6 ? "Blijft redelijk herkenbaar" : "Mag veel veranderen"}</b></span><input type="range" min="1" max="15" step=".1" value={guidanceScale} onChange={e=>setGuidanceScale(+e.target.value)}/></label><label><span>Hoe kunstig gaat het worden? <b>{strength.toFixed(2)} · {strength <= .4 ? "Rustig" : strength <= .7 ? "Kunstig" : "Heel kunstig"}</b></span><input type="range" min="0" max="1" step=".01" value={strength} onChange={e=>setStrength(+e.target.value)}/></label></div>}</div>}
       </div>
 
       <div className="bottom-actions">

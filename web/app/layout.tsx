@@ -8,13 +8,13 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DataLab AI Artist",
-  description: "AI photo transformation studio · DataLab Hogeschool van Amsterdam",
+  title: "HvA DataLab AI-Artist",
+  description: "AI-fotostudio voor beeldtransformatie · DataLab Hogeschool van Amsterdam",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="nl">
       <body className={ibmPlexMono.className}>{children}</body>
     </html>
   );
