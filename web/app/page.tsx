@@ -36,6 +36,7 @@ export default function Home() {
   const [loading,setLoading]=useState(false);
   const [mounted,setMounted]=useState(false);
   const [fullscreenResult,setFullscreenResult]=useState(false);
+  const [faceDetected,setFaceDetected]=useState(false);
   const selected=useMemo(()=>styles.find(s=>s.id===selectedId),[selectedId]);
 
   useEffect(()=>setMounted(true),[]);
@@ -43,7 +44,7 @@ export default function Home() {
   const reset=()=>{
     setPhoto(null); setOriginalPhoto(null); setGeneratedPhoto(null); setSelectedId("");
     setStopCamera(false); setLoading(false); setFullscreenResult(false); setPresetState("balanced");
-    setStrength(.45); setGuidanceScale(6.5); setStep(1);
+    setStrength(.45); setGuidanceScale(6.5); setStep(1); setFaceDetected(false);
   };
 
   const getPhoto=async()=>{
@@ -53,7 +54,19 @@ export default function Home() {
       const blob=await response.blob();
       const url=URL.createObjectURL(blob);
       setPhoto(url); setOriginalPhoto(url); setStopCamera(true); setStep(2);
+      detectFace(blob);
     }catch(error){ console.error(error); }
+  };
+
+  const detectFace=async(blob:Blob)=>{
+    try{
+      const formData=new FormData();
+      formData.append("image",blob,"captured_image.jpg");
+      const response=await fetch("http://localhost:5000/detect_face",{method:"POST",body:formData});
+      if(!response.ok) throw new Error("Face detection failed");
+      const data=await response.json();
+      setFaceDetected(!!data.face_detected);
+    }catch(error){ console.error(error); setFaceDetected(false); }
   };
 
   const choosePreset=(key:Preset)=>{
@@ -115,6 +128,7 @@ export default function Home() {
       <div className="preview-top"><div className="brand brand-light"><span className="brand-mark hva-mark" aria-hidden><img src="./favicon.ico" alt=""/></span><span><b>HvA</b> DataLab <b>AI-Artist</b></span></div><span className="live-pill"><i/> {photo?"FOTO KLAAR":"LIVE CAMERA"}</span></div>
       <div className="preview-frame">
         {!photo ? <Camera stopCamera={stopCamera}/> : <img src={photo} alt="Gemaakte foto" className="captured"/>}
+        {photo && faceDetected && <span className="face-pill"><i/> Gezicht herkend</span>}
         {loading && <div className="generation-overlay"><div className="loader"/><strong>Je {selected?.title}-afbeelding wordt gemaakt…</strong><span>Je foto wordt met AI omgezet</span></div>}
       </div>
       <div className="preview-caption">{photo ? <><span>Gemaakte foto</span><button onClick={reset}>Nieuwe foto maken</button></> : <><span>Zorg dat je onderwerp goed in beeld staat</span><span>Cameravoorbeeld</span></>}</div>
@@ -128,7 +142,7 @@ export default function Home() {
 
         {step===2 && <div className="screen-block"><span className="eyebrow">STAP 02</span><h1>Kies een stijl</h1><p className="lead">Kies de visuele richting voor je transformatie.</p><div className="style-grid">{styles.map(s=><button key={s.id} className={"style-card "+(selectedId===s.id?"selected":"")} onClick={()=>setSelectedId(s.id)}><div className="style-art"><img src={s.image} alt={s.title+" stijlreferentie"} loading="lazy"/></div><div><b>{s.title}</b><small>{s.id==="winter"?"Sfeereffect":"Kunststijl"}</small></div>{selectedId===s.id&&<i className="check">✓</i>}</button>)}</div></div>}
 
-        {step===3 && <div className="screen-block"><span className="eyebrow">STAP 03</span><h1>Hoe creatief mag AI zijn?</h1><p className="lead">Kies hoeveel het resultaat op je originele foto moet blijven lijken.</p><div className="preset-list">{(Object.keys(presets) as Preset[]).map(key=><button key={key} onClick={()=>choosePreset(key)} className={"preset-card "+(preset===key?"selected":"")}><span className="preset-dot"/><div><b>{presets[key].label}</b><small>{presets[key].description}</small></div>{preset===key&&<span className="preset-check">✓</span>}</button>)}</div><div className="closeup-warning"><b>Close-up van een gezicht?</b><span>Bij close-ups kan AI gezichten soms onnatuurlijk maken. Voor de beste resultaten adviseren we de stand <strong>Creatief</strong> (foto overnemen {presets.creative.guidance}, kunstigheid {presets.creative.strength}).</span></div><button className="advanced-toggle" onClick={()=>setAdvanced(!advanced)}>Geavanceerde instellingen <span>{advanced?"−":"+"}</span></button>{advanced&&<div className="advanced-box"><label><span>Hoe erg gaat het op de foto lijken? <b>{guidanceScale.toFixed(1)} · {guidanceScale >= 10 ? "Lijkt veel op de foto" : guidanceScale >= 6 ? "Blijft redelijk herkenbaar" : "Mag veel veranderen"}</b></span><input type="range" min="1" max="15" step=".1" value={guidanceScale} onChange={e=>setGuidanceScale(+e.target.value)}/></label><label><span>Hoe kunstig gaat het worden? <b>{strength.toFixed(2)} · {strength <= .4 ? "Rustig" : strength <= .7 ? "Kunstig" : "Heel kunstig"}</b></span><input type="range" min="0" max="1" step=".01" value={strength} onChange={e=>setStrength(+e.target.value)}/></label></div>}</div>}
+        {step===3 && <div className="screen-block"><span className="eyebrow">STAP 03</span><h1>Hoe creatief mag AI zijn?</h1><p className="lead">Kies hoeveel het resultaat op je originele foto moet blijven lijken.</p><div className="preset-list">{(Object.keys(presets) as Preset[]).map(key=><button key={key} onClick={()=>choosePreset(key)} className={"preset-card "+(preset===key?"selected":"")}><span className="preset-dot"/><div><b>{presets[key].label}</b><small>{presets[key].description}</small></div>{preset===key&&<span className="preset-check">✓</span>}</button>)}</div>{faceDetected&&<div className="closeup-warning"><b>Close-up van een gezicht?</b><span>Bij close-ups kan AI gezichten soms onnatuurlijk maken. Voor de beste resultaten adviseren we de stand <strong>Creatief</strong> (foto overnemen {presets.creative.guidance}, kunstigheid {presets.creative.strength}).</span></div>}<button className="advanced-toggle" onClick={()=>setAdvanced(!advanced)}>Geavanceerde instellingen <span>{advanced?"−":"+"}</span></button>{advanced&&<div className="advanced-box"><label><span>Hoe erg gaat het op de foto lijken? <b>{guidanceScale.toFixed(1)} · {guidanceScale >= 10 ? "Lijkt veel op de foto" : guidanceScale >= 6 ? "Blijft redelijk herkenbaar" : "Mag veel veranderen"}</b></span><input type="range" min="1" max="15" step=".1" value={guidanceScale} onChange={e=>setGuidanceScale(+e.target.value)}/></label><label><span>Hoe kunstig gaat het worden? <b>{strength.toFixed(2)} · {strength <= .4 ? "Rustig" : strength <= .7 ? "Kunstig" : "Heel kunstig"}</b></span><input type="range" min="0" max="1" step=".01" value={strength} onChange={e=>setStrength(+e.target.value)}/></label></div>}</div>}
       </div>
 
       <div className="bottom-actions">

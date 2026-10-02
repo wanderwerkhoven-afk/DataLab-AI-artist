@@ -169,6 +169,17 @@ def _build_prompt(style_prompt: str, has_face: bool) -> str:
     )
 
 
+async def detect_face(image: UploadFile):
+    try:
+        image_data = await image.read()
+        init_image = _prepare_image(Image.open(io.BytesIO(image_data)))
+        face_data = _extract_faceid(init_image)
+        return {"face_detected": face_data is not None and face_adapter is not None}
+    except Exception as exc:
+        print(f"[AI Artist] Face detection error: {exc}")
+        raise HTTPException(status_code=500, detail=f"Face detection failed: {exc}")
+
+
 async def generate_image(
     image: UploadFile,
     prompt: str,

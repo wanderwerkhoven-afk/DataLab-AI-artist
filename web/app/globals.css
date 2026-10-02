@@ -20,7 +20,9 @@ button:focus-visible,input:focus-visible{outline:3px solid rgba(37,99,235,.22);o
 .live-pill i{width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 4px rgba(34,197,94,.12)}
 .preview-frame{position:relative;min-height:0;overflow:hidden;border-radius:18px;background:#0b1020;box-shadow:0 18px 50px rgba(0,0,0,.25)}
 .preview-frame>img,.captured{width:100%;height:100%;object-fit:contain;display:block}
-.preview-frame>img[alt="No Camera Feed"]{object-fit:cover}
+.preview-frame>img[alt="Geen camerabeeld"]{object-fit:cover}
+.face-pill{position:absolute;z-index:2;top:14px;left:14px;display:flex;align-items:center;gap:7px;padding:6px 11px;border-radius:999px;background:rgba(15,23,42,.65);backdrop-filter:blur(8px);color:#fff;font-size:10px;letter-spacing:.06em}
+.face-pill i{width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 4px rgba(34,197,94,.18)}
 .preview-caption{display:flex;align-items:center;justify-content:space-between;color:#94a3b8;font-size:11px;padding:0 4px}
 .preview-caption button{border:0;background:none;color:#e2e8f0;text-decoration:underline;text-underline-offset:3px}
 .control-panel{position:relative;display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-width:0;min-height:0;background:#fff;border-left:1px solid #e5e7eb}
