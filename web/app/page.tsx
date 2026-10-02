@@ -35,13 +35,14 @@ export default function Home() {
   const [stopCamera,setStopCamera]=useState(false);
   const [loading,setLoading]=useState(false);
   const [mounted,setMounted]=useState(false);
+  const [fullscreenResult,setFullscreenResult]=useState(false);
   const selected=useMemo(()=>styles.find(s=>s.id===selectedId),[selectedId]);
 
   useEffect(()=>setMounted(true),[]);
 
   const reset=()=>{
     setPhoto(null); setOriginalPhoto(null); setGeneratedPhoto(null); setSelectedId("");
-    setStopCamera(false); setLoading(false); setPresetState("balanced");
+    setStopCamera(false); setLoading(false); setFullscreenResult(false); setPresetState("balanced");
     setStrength(.45); setGuidanceScale(6.5); setStep(1);
   };
 
@@ -87,6 +88,14 @@ export default function Home() {
 
   const labels=["Photo","Style","Adjust","Result"];
 
+  if(fullscreenResult && generatedPhoto){
+    return <main className="fullscreen-result" onClick={()=>setFullscreenResult(false)}>
+      <button className="fullscreen-close" onClick={()=>setFullscreenResult(false)} aria-label="Close fullscreen">×</button>
+      <img src={generatedPhoto} alt="AI generated result fullscreen"/>
+      <div className="fullscreen-hint"><strong>Take a photo of your creation</strong><span>Tap anywhere to go back</span></div>
+    </main>;
+  }
+
   if(step===4 && originalPhoto && generatedPhoto){
     return <main className="result-page">
       <header className="topbar"><div className="brand"><span className="brand-mark">AI</span><span>DataLab <b>AI Artist</b></span></div><button className="ghost-btn" onClick={reset}>Start over ↻</button></header>
@@ -96,7 +105,7 @@ export default function Home() {
           <figure><div className="image-label">Original</div><img src={originalPhoto} alt="Original photo"/></figure>
           <figure><div className="image-label accent">AI generated</div><img src={generatedPhoto} alt="AI generated result"/></figure>
         </div>
-        <div className="result-actions"><button className="secondary-btn" onClick={()=>setStep(3)}>← Edit settings</button><button className="primary-btn" onClick={downloadResult}>Download image ↓</button><button className="secondary-btn" onClick={reset}>New photo</button></div>
+        <div className="result-actions"><button className="secondary-btn" onClick={()=>setStep(3)}>← Edit settings</button><button className="primary-btn" onClick={()=>setFullscreenResult(true)}>View fullscreen ⛶</button><button className="secondary-btn" onClick={downloadResult}>Download image ↓</button><button className="secondary-btn" onClick={reset}>New photo</button></div>
       </section>
     </main>;
   }
