@@ -48,6 +48,10 @@ export default function Home() {
 
   useEffect(()=>setMounted(true),[]);
 
+  useEffect(()=>{
+    setStrength(activePresets[preset].strength); setGuidanceScale(activePresets[preset].guidance);
+  },[faceDetected]);
+
   const reset=()=>{
     setPhoto(null); setOriginalPhoto(null); setGeneratedPhoto(null); setSelectedId("");
     setStopCamera(false); setLoading(false); setFullscreenResult(false); setPresetState("balanced");
