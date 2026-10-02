@@ -23,7 +23,7 @@ const presets: Record<Preset,{strength:number; guidance:number; label:string; de
 const Arrow = ({back=false}:{back?:boolean}) => <span aria-hidden>{back ? "←" : "→"}</span>;
 
 const photoSimilarityLabel = (value:number) =>
-  value <= .33 ? "Lijkt veel op de foto" : value <= .55 ? "Een beetje anders" : "Heel anders";
+  value >= .75 ? "Lijkt veel op de foto" : value >= .45 ? "Blijft redelijk herkenbaar" : "Mag veel veranderen";
 
 const artisticLabel = (value:number) =>
   value <= 5 ? "Rustig" : value <= 9 ? "Kunstig" : "Heel kunstig";
