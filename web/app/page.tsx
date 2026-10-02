@@ -17,7 +17,13 @@ const styles = [
 const presets: Record<Preset,{strength:number; guidance:number; label:string; description:string}> = {
   subtle:{strength:.40,guidance:11.0,label:"Subtiel",description:"Houdt de originele foto goed herkenbaar"},
   balanced:{strength:.45,guidance:7.5,label:"Gebalanceerd",description:"Een duidelijke verandering, maar de foto blijft herkenbaar"},
-  creative:{strength:.75,guidance:3.5,label:"Creatief",description:"Geeft AI meer vrijheid om de foto te veranderen"},
+  creative:{strength:.60,guidance:5.5,label:"Creatief",description:"Geeft AI meer vrijheid om de foto te veranderen"},
+};
+
+const facePresets: Record<Preset,{strength:number; guidance:number; label:string; description:string}> = {
+  subtle:{strength:.65,guidance:4.5,label:"Subtiel",description:"Houdt de originele foto goed herkenbaar"},
+  balanced:{strength:.75,guidance:3.5,label:"Gebalanceerd",description:"Een duidelijke verandering, maar de foto blijft herkenbaar"},
+  creative:{strength:.85,guidance:2.5,label:"Creatief",description:"Geeft AI meer vrijheid om de foto te veranderen"},
 };
 
 const Arrow = ({back=false}:{back?:boolean}) => <span aria-hidden>{back ? "←" : "→"}</span>;
@@ -38,6 +44,7 @@ export default function Home() {
   const [fullscreenResult,setFullscreenResult]=useState(false);
   const [faceDetected,setFaceDetected]=useState(false);
   const selected=useMemo(()=>styles.find(s=>s.id===selectedId),[selectedId]);
+  const activePresets=faceDetected?facePresets:presets;
 
   useEffect(()=>setMounted(true),[]);
 
@@ -53,8 +60,9 @@ export default function Home() {
       if(!response.ok) throw new Error("Photo capture failed");
       const blob=await response.blob();
       const url=URL.createObjectURL(blob);
-      setPhoto(url); setOriginalPhoto(url); setStopCamera(true); setStep(2);
-      detectFace(blob);
+      setPhoto(url); setOriginalPhoto(url); setStopCamera(true);
+      await detectFace(blob);
+      setStep(2);
     }catch(error){ console.error(error); }
   };
 
@@ -70,7 +78,7 @@ export default function Home() {
   };
 
   const choosePreset=(key:Preset)=>{
-    setPresetState(key); setStrength(presets[key].strength); setGuidanceScale(presets[key].guidance);
+    setPresetState(key); setStrength(activePresets[key].strength); setGuidanceScale(activePresets[key].guidance);
   };
 
   const generate=async()=>{
@@ -142,7 +150,7 @@ export default function Home() {
 
         {step===2 && <div className="screen-block"><span className="eyebrow">STAP 02</span><h1>Kies een stijl</h1><p className="lead">Kies de visuele richting voor je transformatie.</p><div className="style-grid">{styles.map(s=><button key={s.id} className={"style-card "+(selectedId===s.id?"selected":"")} onClick={()=>setSelectedId(s.id)}><div className="style-art"><img src={s.image} alt={s.title+" stijlreferentie"} loading="lazy"/></div><div><b>{s.title}</b><small>{s.id==="winter"?"Sfeereffect":"Kunststijl"}</small></div>{selectedId===s.id&&<i className="check">✓</i>}</button>)}</div></div>}
 
-        {step===3 && <div className="screen-block"><span className="eyebrow">STAP 03</span><h1>Hoe creatief mag AI zijn?</h1><p className="lead">Kies hoeveel het resultaat op je originele foto moet blijven lijken.</p><div className="preset-list">{(Object.keys(presets) as Preset[]).map(key=><button key={key} onClick={()=>choosePreset(key)} className={"preset-card "+(preset===key?"selected":"")}><span className="preset-dot"/><div><b>{presets[key].label}</b><small>{presets[key].description}</small></div>{preset===key&&<span className="preset-check">✓</span>}</button>)}</div>{faceDetected&&<div className="closeup-warning"><b>Close-up van een gezicht?</b><span>Bij close-ups kan AI gezichten soms onnatuurlijk maken. Voor de beste resultaten adviseren we de stand <strong>Creatief</strong> (foto overnemen {presets.creative.guidance}, kunstigheid {presets.creative.strength}).</span></div>}<button className="advanced-toggle" onClick={()=>setAdvanced(!advanced)}>Geavanceerde instellingen <span>{advanced?"−":"+"}</span></button>{advanced&&<div className="advanced-box"><label><span>Hoe erg gaat het op de foto lijken? <b>{guidanceScale.toFixed(1)} · {guidanceScale >= 10 ? "Lijkt veel op de foto" : guidanceScale >= 6 ? "Blijft redelijk herkenbaar" : "Mag veel veranderen"}</b></span><input type="range" min="1" max="15" step=".1" value={guidanceScale} onChange={e=>setGuidanceScale(+e.target.value)}/></label><label><span>Hoe kunstig gaat het worden? <b>{strength.toFixed(2)} · {strength <= .4 ? "Rustig" : strength <= .7 ? "Kunstig" : "Heel kunstig"}</b></span><input type="range" min="0" max="1" step=".01" value={strength} onChange={e=>setStrength(+e.target.value)}/></label></div>}</div>}
+        {step===3 && <div className="screen-block"><span className="eyebrow">STAP 03</span><h1>Hoe creatief mag AI zijn?</h1><p className="lead">Kies hoeveel het resultaat op je originele foto moet blijven lijken.</p><div className="preset-list">{(Object.keys(activePresets) as Preset[]).map(key=><button key={key} onClick={()=>choosePreset(key)} className={"preset-card "+(preset===key?"selected":"")}><span className="preset-dot"/><div><b>{activePresets[key].label}</b><small>{activePresets[key].description}</small></div>{preset===key&&<span className="preset-check">✓</span>}</button>)}</div><button className="advanced-toggle" onClick={()=>setAdvanced(!advanced)}>Geavanceerde instellingen <span>{advanced?"−":"+"}</span></button>{advanced&&<div className="advanced-box"><label><span>Hoe erg gaat het op de foto lijken? <b>{guidanceScale.toFixed(1)} · {guidanceScale >= 10 ? "Lijkt veel op de foto" : guidanceScale >= 6 ? "Blijft redelijk herkenbaar" : "Mag veel veranderen"}</b></span><input type="range" min="1" max="15" step=".1" value={guidanceScale} onChange={e=>setGuidanceScale(+e.target.value)}/></label><label><span>Hoe kunstig gaat het worden? <b>{strength.toFixed(2)} · {strength <= .4 ? "Rustig" : strength <= .7 ? "Kunstig" : "Heel kunstig"}</b></span><input type="range" min="0" max="1" step=".01" value={strength} onChange={e=>setStrength(+e.target.value)}/></label></div>}</div>}
       </div>
 
       <div className="bottom-actions">
