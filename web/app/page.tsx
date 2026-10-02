@@ -81,6 +81,13 @@ export default function Home() {
     setPresetState(key); setStrength(activePresets[key].strength); setGuidanceScale(activePresets[key].guidance);
   };
 
+  const goBack=()=>{
+    if(step===2){
+      setPhoto(null); setOriginalPhoto(null); setStopCamera(false); setFaceDetected(false);
+    }
+    setStep(step-1);
+  };
+
   const generate=async()=>{
     if(!photo||!selected) return;
     setLoading(true);
@@ -155,7 +162,7 @@ export default function Home() {
 
       <div className="bottom-actions">
         {step===1 ? <button className="primary-btn" onClick={getPhoto}>Foto maken <span>◎</span></button> :
-        <><button className="back-btn" onClick={()=>setStep(step-1)}><Arrow back/> Terug</button>{step===2?<button disabled={!selectedId} className="primary-btn" onClick={()=>setStep(3)}>Verder <Arrow/></button>:<button disabled={loading} className="primary-btn generate" onClick={generate}>{loading?"Bezig met maken…":"Afbeelding maken"} <span>✦</span></button>}</>}
+        <><button className="back-btn" onClick={goBack}><Arrow back/> Terug</button>{step===2?<button disabled={!selectedId} className="primary-btn" onClick={()=>setStep(3)}>Verder <Arrow/></button>:<button disabled={loading} className="primary-btn generate" onClick={generate}>{loading?"Bezig met maken…":"Afbeelding maken"} <span>✦</span></button>}</>}
       </div>
     </aside>
   </main>;
