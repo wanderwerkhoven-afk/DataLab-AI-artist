@@ -15,9 +15,9 @@ const styles = [
 ];
 
 const presets: Record<Preset,{strength:number; guidance:number; label:string; description:string}> = {
-  subtle:{strength:.30,guidance:5.5,label:"Subtiel",description:"Houdt de originele foto goed herkenbaar"},
-  balanced:{strength:.45,guidance:6.5,label:"Gebalanceerd",description:"Een duidelijke verandering, maar de foto blijft herkenbaar"},
-  creative:{strength:.60,guidance:7.5,label:"Creatief",description:"Geeft AI meer vrijheid om de foto te veranderen"},
+  subtle:{strength:.75,guidance:3.5,label:"Subtiel",description:"Houdt de originele foto goed herkenbaar"},
+  balanced:{strength:.45,guidance:7.5,label:"Gebalanceerd",description:"Een duidelijke verandering, maar de foto blijft herkenbaar"},
+  creative:{strength:.40,guidance:11.0,label:"Creatief",description:"Geeft AI meer vrijheid om de foto te veranderen"},
 };
 
 const Arrow = ({back=false}:{back?:boolean}) => <span aria-hidden>{back ? "←" : "→"}</span>;
