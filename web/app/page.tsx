@@ -104,7 +104,7 @@ export default function Home() {
 
   if(step===4 && originalPhoto && generatedPhoto){
     return <main className="result-page">
-      <header className="topbar"><div className="brand"><span className="brand-mark">AI</span><span>DataLab <b>AI Artist</b></span></div><button className="ghost-btn" onClick={reset}>Opnieuw beginnen ↻</button></header>
+      <header className="topbar"><div className="brand"><span className="brand-mark hva-mark" aria-hidden><span className="hva-arc"/><span className="hva-stem"/></span><span><b>HvA</b> DataLab <b>AI-Artist</b></span></div><button className="ghost-btn" onClick={reset}>Opnieuw beginnen ↻</button></header>
       <section className="result-shell">
         <div className="result-heading"><div><span className="eyebrow">CREATIE KLAAR</span><h1>Je afbeelding is klaar</h1><p>{selected?.title} · {presets[preset].label} transformatie</p></div></div>
         <div className="comparison-grid">
@@ -118,7 +118,7 @@ export default function Home() {
 
   return <main className="studio">
     <section className="preview-panel">
-      <div className="preview-top"><div className="brand brand-light"><span className="brand-mark">AI</span><span>DataLab <b>AI Artist</b></span></div><span className="live-pill"><i/> {photo?"FOTO KLAAR":"LIVE CAMERA"}</span></div>
+      <div className="preview-top"><div className="brand brand-light"><span className="brand-mark hva-mark" aria-hidden><span className="hva-arc"/><span className="hva-stem"/></span><span><b>HvA</b> DataLab <b>AI-Artist</b></span></div><span className="live-pill"><i/> {photo?"FOTO KLAAR":"LIVE CAMERA"}</span></div>
       <div className="preview-frame">
         {!photo ? <Camera stopCamera={stopCamera}/> : <img src={photo} alt="Gemaakte foto" className="captured"/>}
         {loading && <div className="generation-overlay"><div className="loader"/><strong>Je {selected?.title}-afbeelding wordt gemaakt…</strong><span>Je foto wordt met AI omgezet</span></div>}
