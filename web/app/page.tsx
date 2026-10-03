@@ -21,9 +21,9 @@ const presets: Record<Preset,{strength:number; guidance:number; label:string; de
 };
 
 const facePresets: Record<Preset,{strength:number; guidance:number; label:string; description:string}> = {
-  subtle:{strength:.65,guidance:4.5,label:"Subtiel",description:"Houdt de originele foto goed herkenbaar"},
-  balanced:{strength:.75,guidance:3.5,label:"Gebalanceerd",description:"Een duidelijke verandering, maar de foto blijft herkenbaar"},
-  creative:{strength:.85,guidance:2.5,label:"Creatief",description:"Geeft AI meer vrijheid om de foto te veranderen"},
+  subtle:{strength:.55,guidance:5.5,label:"Subtiel",description:"Houdt de originele foto goed herkenbaar"},
+  balanced:{strength:.65,guidance:4.5,label:"Gebalanceerd",description:"Een duidelijke verandering, maar de foto blijft herkenbaar"},
+  creative:{strength:.75,guidance:3.5,label:"Creatief",description:"Geeft AI meer vrijheid om de foto te veranderen"},
 };
 
 const Arrow = ({back=false}:{back?:boolean}) => <span aria-hidden>{back ? "←" : "→"}</span>;
